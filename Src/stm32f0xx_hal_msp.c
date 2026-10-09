@@ -56,7 +56,9 @@
 /* USER CODE BEGIN 0 */
 
 /* USER CODE END 0 */
-/**
+
+void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
+                    /**
   * Initializes the Global MSP.
   */
 void HAL_MspInit(void)
@@ -86,24 +88,47 @@ void HAL_MspInit(void)
   */
 void HAL_TIM_Base_MspInit(TIM_HandleTypeDef* htim_base)
 {
-  if(htim_base->Instance==TIM7)
+  if(htim_base->Instance==TIM14)
   {
-    /* USER CODE BEGIN TIM7_MspInit 0 */
+    /* USER CODE BEGIN TIM14_MspInit 0 */
 
-    /* USER CODE END TIM7_MspInit 0 */
+    /* USER CODE END TIM14_MspInit 0 */
     /* Peripheral clock enable */
-    __HAL_RCC_TIM7_CLK_ENABLE();
-    /* TIM7 interrupt Init */
-    HAL_NVIC_SetPriority(TIM7_IRQn, 3, 0);
-    HAL_NVIC_EnableIRQ(TIM7_IRQn);
-    /* USER CODE BEGIN TIM7_MspInit 1 */
+    __HAL_RCC_TIM14_CLK_ENABLE();
+    /* USER CODE BEGIN TIM14_MspInit 1 */
 
-    /* USER CODE END TIM7_MspInit 1 */
+    /* USER CODE END TIM14_MspInit 1 */
 
   }
 
 }
 
+void HAL_TIM_MspPostInit(TIM_HandleTypeDef* htim)
+{
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
+  if(htim->Instance==TIM14)
+  {
+    /* USER CODE BEGIN TIM14_MspPostInit 0 */
+
+    /* USER CODE END TIM14_MspPostInit 0 */
+
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+    /**TIM14 GPIO Configuration
+    PA4     ------> TIM14_CH1
+    */
+    GPIO_InitStruct.Pin = MY_PWM_PIN_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+    GPIO_InitStruct.Alternate = GPIO_AF4_TIM14;
+    HAL_GPIO_Init(MY_PWM_PIN_GPIO_Port, &GPIO_InitStruct);
+
+    /* USER CODE BEGIN TIM14_MspPostInit 1 */
+
+    /* USER CODE END TIM14_MspPostInit 1 */
+  }
+
+}
 /**
   * @brief TIM_Base MSP De-Initialization
   * This function freeze the hardware resources used in this example
@@ -112,19 +137,16 @@ void HAL_TIM_Base_MspInit(TIM_HandleTypeDef* htim_base)
   */
 void HAL_TIM_Base_MspDeInit(TIM_HandleTypeDef* htim_base)
 {
-  if(htim_base->Instance==TIM7)
+  if(htim_base->Instance==TIM14)
   {
-    /* USER CODE BEGIN TIM7_MspDeInit 0 */
+    /* USER CODE BEGIN TIM14_MspDeInit 0 */
 
-    /* USER CODE END TIM7_MspDeInit 0 */
+    /* USER CODE END TIM14_MspDeInit 0 */
     /* Peripheral clock disable */
-    __HAL_RCC_TIM7_CLK_DISABLE();
+    __HAL_RCC_TIM14_CLK_DISABLE();
+    /* USER CODE BEGIN TIM14_MspDeInit 1 */
 
-    /* TIM7 interrupt DeInit */
-    HAL_NVIC_DisableIRQ(TIM7_IRQn);
-    /* USER CODE BEGIN TIM7_MspDeInit 1 */
-
-    /* USER CODE END TIM7_MspDeInit 1 */
+    /* USER CODE END TIM14_MspDeInit 1 */
   }
 
 }

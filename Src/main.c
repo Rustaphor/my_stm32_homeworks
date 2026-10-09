@@ -19,7 +19,6 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "cmsis_os.h"
-#include <stdint.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -43,7 +42,7 @@ typedef StaticEventGroup_t osStaticEventGroupDef_t;
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-TIM_HandleTypeDef htim7;
+TIM_HandleTypeDef htim14;
 
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
@@ -67,7 +66,7 @@ const osEventFlagsAttr_t TIM_OVF_attributes = {
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_TIM7_Init(void);
+static void MX_TIM14_Init(void);
 void task_Default(void *argument);
 
 /* USER CODE BEGIN PFP */
@@ -76,14 +75,6 @@ void task_Default(void *argument);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-void my_millis(uint32_t val) {
-  uint32_t flags;
-
-  for (uint32_t i=0; i<=val; i++) {
-    flags = osEventFlagsWait(TIM_OVFHandle, 0x01, osFlagsWaitAny, osWaitForever);
-    osEventFlagsClear(TIM_OVFHandle, flags); 
-  }
-}
 
 /* USER CODE END 0 */
 
@@ -116,11 +107,11 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_TIM7_Init();
+  MX_TIM14_Init();
   /* USER CODE BEGIN 2 */
   
-  // Старт кастомного таймера задержки
-  HAL_TIM_Base_Start_IT(&htim7);
+  // Старт ШИМ-счетчика
+  HAL_TIM_PWM_Start(&htim14, TIM_CHANNEL_1);
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -213,40 +204,48 @@ void SystemClock_Config(void)
 }
 
 /**
-  * @brief TIM7 Initialization Function
+  * @brief TIM14 Initialization Function
   * @param None
   * @retval None
   */
-static void MX_TIM7_Init(void)
+static void MX_TIM14_Init(void)
 {
 
-  /* USER CODE BEGIN TIM7_Init 0 */
+  /* USER CODE BEGIN TIM14_Init 0 */
 
-  /* USER CODE END TIM7_Init 0 */
+  /* USER CODE END TIM14_Init 0 */
 
-  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
 
-  /* USER CODE BEGIN TIM7_Init 1 */
+  /* USER CODE BEGIN TIM14_Init 1 */
 
-  /* USER CODE END TIM7_Init 1 */
-  htim7.Instance = TIM7;
-  htim7.Init.Prescaler = 0;
-  htim7.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim7.Init.Period = 23999;
-  htim7.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
-  if (HAL_TIM_Base_Init(&htim7) != HAL_OK)
+  /* USER CODE END TIM14_Init 1 */
+  htim14.Instance = TIM14;
+  htim14.Init.Prescaler = 8;
+  htim14.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim14.Init.Period = 255;
+  htim14.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim14.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim14) != HAL_OK)
   {
     Error_Handler();
   }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_UPDATE;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim7, &sMasterConfig) != HAL_OK)
+  if (HAL_TIM_PWM_Init(&htim14) != HAL_OK)
   {
     Error_Handler();
   }
-  /* USER CODE BEGIN TIM7_Init 2 */
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 0;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_PWM_ConfigChannel(&htim14, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM14_Init 2 */
 
-  /* USER CODE END TIM7_Init 2 */
+  /* USER CODE END TIM14_Init 2 */
+  HAL_TIM_MspPostInit(&htim14);
 
 }
 
@@ -312,10 +311,14 @@ void task_Default(void *argument)
   /* USER CODE BEGIN 5 */
 
   /* Infinite loop */
-  for(;;)
-  {
-    my_millis(500);
-    HAL_GPIO_TogglePin(LD6_GPIO_Port,LD6_Pin);
+  while(1){
+
+    for (uint8_t i = 0; i < 255; i+=15){
+      TIM14->CCR1 = i;
+      osDelay(20);
+      TIM14->CCR1 = TIM14->CCR1 += i;
+    }
+
   }
   /* USER CODE END 5 */
 }
