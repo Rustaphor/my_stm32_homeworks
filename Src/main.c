@@ -19,7 +19,6 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "cmsis_os.h"
-#include <stdint.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -27,6 +26,7 @@
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
+typedef StaticTask_t osStaticThreadDef_t;
 typedef StaticEventGroup_t osStaticEventGroupDef_t;
 /* USER CODE BEGIN PTD */
 
@@ -47,18 +47,35 @@ TIM_HandleTypeDef htim7;
 
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
+uint32_t defaultTaskBuffer[ 128 ];
+osStaticThreadDef_t defaultTaskControlBlock;
 const osThreadAttr_t defaultTask_attributes = {
   .name = "defaultTask",
-  .stack_size = 128 * 4,
+  .cb_mem = &defaultTaskControlBlock,
+  .cb_size = sizeof(defaultTaskControlBlock),
+  .stack_mem = &defaultTaskBuffer[0],
+  .stack_size = sizeof(defaultTaskBuffer),
   .priority = (osPriority_t) osPriorityNormal,
 };
-/* Definitions for TIM_OVF */
-osEventFlagsId_t TIM_OVFHandle;
-osStaticEventGroupDef_t event_TIMs;
-const osEventFlagsAttr_t TIM_OVF_attributes = {
-  .name = "TIM_OVF",
-  .cb_mem = &event_TIMs,
-  .cb_size = sizeof(event_TIMs),
+/* Definitions for LedBlink */
+osThreadId_t LedBlinkHandle;
+uint32_t LedBlinkBuffer[ 128 ];
+osStaticThreadDef_t LedBlinkControlBlock;
+const osThreadAttr_t LedBlink_attributes = {
+  .name = "LedBlink",
+  .cb_mem = &LedBlinkControlBlock,
+  .cb_size = sizeof(LedBlinkControlBlock),
+  .stack_mem = &LedBlinkBuffer[0],
+  .stack_size = sizeof(LedBlinkBuffer),
+  .priority = (osPriority_t) osPriorityLow,
+};
+/* Definitions for ledBlnkFlags */
+osEventFlagsId_t ledBlnkFlagsHandle;
+osStaticEventGroupDef_t ledBlnkCtrlBlock;
+const osEventFlagsAttr_t ledBlnkFlags_attributes = {
+  .name = "ledBlnkFlags",
+  .cb_mem = &ledBlnkCtrlBlock,
+  .cb_size = sizeof(ledBlnkCtrlBlock),
 };
 /* USER CODE BEGIN PV */
 
@@ -69,6 +86,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_TIM7_Init(void);
 void task_Default(void *argument);
+void task_ledBlinking(void *argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -76,14 +94,6 @@ void task_Default(void *argument);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-void my_millis(uint32_t val) {
-  uint32_t flags;
-
-  for (uint32_t i=0; i<=val; i++) {
-    flags = osEventFlagsWait(TIM_OVFHandle, 0x01, osFlagsWaitAny, osWaitForever);
-    osEventFlagsClear(TIM_OVFHandle, flags); 
-  }
-}
 
 /* USER CODE END 0 */
 
@@ -119,8 +129,6 @@ int main(void)
   MX_TIM7_Init();
   /* USER CODE BEGIN 2 */
   
-  // Старт кастомного таймера задержки
-  HAL_TIM_Base_Start_IT(&htim7);
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -146,13 +154,16 @@ int main(void)
   /* creation of defaultTask */
   defaultTaskHandle = osThreadNew(task_Default, NULL, &defaultTask_attributes);
 
+  /* creation of LedBlink */
+  LedBlinkHandle = osThreadNew(task_ledBlinking, NULL, &LedBlink_attributes);
+
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
 
   /* Create the event(s) */
-  /* creation of TIM_OVF */
-  TIM_OVFHandle = osEventFlagsNew(&TIM_OVF_attributes);
+  /* creation of ledBlnkFlags */
+  ledBlnkFlagsHandle = osEventFlagsNew(&ledBlnkFlags_attributes);
 
   /* USER CODE BEGIN RTOS_EVENTS */
   /* add events, ... */
@@ -291,12 +302,7 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-// Прерывание таймера задержки
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
-  if(htim->Instance == TIM7){
-      osEventFlagsSet(TIM_OVFHandle,0x01);
-  }
-}
+
 
 /* USER CODE END 4 */
 
@@ -314,10 +320,27 @@ void task_Default(void *argument)
   /* Infinite loop */
   for(;;)
   {
-    my_millis(500);
-    HAL_GPIO_TogglePin(LD6_GPIO_Port,LD6_Pin);
+
   }
   /* USER CODE END 5 */
+}
+
+/* USER CODE BEGIN Header_task_ledBlinking */
+/**
+* @brief Function implementing the LedBlink thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_task_ledBlinking */
+void task_ledBlinking(void *argument)
+{
+  /* USER CODE BEGIN task_ledBlinking */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END task_ledBlinking */
 }
 
 /**
