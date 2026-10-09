@@ -19,6 +19,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "cmsis_os.h"
+#include <stdbool.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -63,6 +64,7 @@ uint32_t LedBlinkBuffer[ 128 ];
 osStaticThreadDef_t LedBlinkControlBlock;
 const osThreadAttr_t LedBlink_attributes = {
   .name = "LedBlink",
+  .attr_bits = osThreadDetached,
   .cb_mem = &LedBlinkControlBlock,
   .cb_size = sizeof(LedBlinkControlBlock),
   .stack_mem = &LedBlinkBuffer[0],
@@ -158,7 +160,7 @@ int main(void)
   LedBlinkHandle = osThreadNew(task_ledBlinking, NULL, &LedBlink_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
-  /* add threads, ... */
+
   /* USER CODE END RTOS_THREADS */
 
   /* Create the event(s) */
@@ -317,10 +319,29 @@ void task_Default(void *argument)
 {
   /* USER CODE BEGIN 5 */
 
+  static uint32_t cnt = 0;
+  static bool lastState = false;
+
   /* Infinite loop */
   for(;;)
   {
-
+    // Опрос кнопки каждые 10 мс, если нажата 8 счетов - включаем флаг для потока мигания светодиода
+    osDelay(10);
+    if (HAL_GPIO_ReadPin(EXT_USER_BUTTON_GPIO_Port, EXT_USER_BUTTON_Pin) == GPIO_PIN_SET) {
+      if (!lastState) {
+        osEventFlagsSet(ledBlnkFlagsHandle, 0x01);
+        osDelay(200); // Таумаут повторного нажания
+        lastState = true;
+      }
+    }
+    
+    if (lastState) {
+      cnt++;
+      if (cnt >= 10) {
+        lastState = false;
+        cnt = 0;
+      }
+    }
   }
   /* USER CODE END 5 */
 }
@@ -335,10 +356,27 @@ void task_Default(void *argument)
 void task_ledBlinking(void *argument)
 {
   /* USER CODE BEGIN task_ledBlinking */
+
+  static bool ledBlinkState = false;
+
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+     
+    if (!ledBlinkState) {
+      osEventFlagsWait(ledBlnkFlagsHandle, 0x01, 0x01, osWaitForever);
+      ledBlinkState = true;
+    }
+
+    osDelay(150);
+    HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
+    osDelay(150);
+    HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
+
+    if(osEventFlagsGet(ledBlnkFlagsHandle) & 0x01) { 
+      osEventFlagsClear(ledBlnkFlagsHandle, 0x01);
+      ledBlinkState = false; 
+    }
   }
   /* USER CODE END task_ledBlinking */
 }
