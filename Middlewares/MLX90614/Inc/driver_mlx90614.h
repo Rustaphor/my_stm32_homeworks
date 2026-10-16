@@ -61,7 +61,7 @@ extern "C"{
  */
 typedef enum
 {
-    MLX90614_ADDRESS_DEFAULT = 0xB4,        /**< default address */
+    MLX90614_ADDRESS_DEFAULT = 0xB4,        /**< default address or 0x5A or 0xB4*/
 } mlx90614_address_t;
 
 /**

@@ -23,7 +23,11 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <string.h>
+#include <inttypes.h>
+#include "usbd_cdc_if.h"
+#include "driver_mlx90614.h"
+#include "driver_mlx90614_interface.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -58,7 +62,8 @@ const osThreadAttr_t defaultTask_attributes = {
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* USER CODE BEGIN PV */
-
+static mlx90614_handle_t h_Mlx90614;
+char str[64];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -294,7 +299,48 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+uint8_t mlx90614_interface_iic_init_deinit(void)
+{
+    return 0;
+}
 
+uint8_t mlx90614_interface_iic_deinit(void)
+{
+    return 0;
+}
+
+uint8_t mlx90614_interface_iic_read(uint8_t addr, uint8_t reg, uint8_t *buf, uint16_t len)
+{
+    return HAL_I2C_Mem_Read(&hi2c2, addr, reg, I2C_MEMADD_SIZE_8BIT, buf, len, HAL_MAX_DELAY);
+}
+
+uint8_t mlx90614_interface_iic_write(uint8_t addr, uint8_t reg, uint8_t *buf, uint16_t len)
+{
+    return HAL_I2C_Mem_Write(&hi2c2, addr, reg, I2C_MEMADD_SIZE_8BIT, buf, len, HAL_MAX_DELAY);
+}
+
+void mlx90614_interface_delay_ms(uint32_t ms)
+{
+    osDelay(ms);
+}
+
+uint8_t mlx90614_interface_byte_rw(uint8_t value)
+{
+    return 0;
+}
+
+void mlx90614_interface_debug_print(const char *const fmt, ...)
+{
+    // char str[256];
+    // va_list args;
+    
+    // memset((char *)str, 0, sizeof(char) * 256); 
+    // va_start(args, fmt);
+    // vsnprintf((char *)str, 255, (char const *)fmt, args);
+    // va_end(args);
+
+    // CDC_Transmit_FS(str,strlen((char *)str)); //USBUSER_Log("%u");  
+}
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_task_Default */
@@ -310,18 +356,50 @@ void task_Default(void *argument)
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 5 */
 
+    uint8_t result;
+    uint16_t raw_val1, raw_val2;
+    float ambient, object;
+
+    /* link interface function */
+    DRIVER_MLX90614_LINK_INIT(&h_Mlx90614, mlx90614_handle_t);
+    DRIVER_MLX90614_LINK_IIC_INIT(&h_Mlx90614, mlx90614_interface_iic_init_deinit);
+    DRIVER_MLX90614_LINK_IIC_DEINIT(&h_Mlx90614, mlx90614_interface_iic_init_deinit);
+    DRIVER_MLX90614_LINK_IIC_READ(&h_Mlx90614, mlx90614_interface_iic_read);
+    DRIVER_MLX90614_LINK_IIC_WRITE(&h_Mlx90614, mlx90614_interface_iic_write);
+    DRIVER_MLX90614_LINK_SCL_WRITE(&h_Mlx90614, mlx90614_interface_byte_rw);
+    DRIVER_MLX90614_LINK_SDA_WRITE(&h_Mlx90614, mlx90614_interface_byte_rw);
+    DRIVER_MLX90614_LINK_DELAY_MS(&h_Mlx90614, mlx90614_interface_delay_ms);
+    DRIVER_MLX90614_LINK_DEBUG_PRINT(&h_Mlx90614, mlx90614_interface_debug_print);
+
+    result = mlx90614_set_addr(&h_Mlx90614, MLX90614_ADDRESS_DEFAULT);
+    result = mlx90614_init(&h_Mlx90614);
+    result = mlx90614_pwm_to_smbus(&h_Mlx90614);
+    result = mlx90614_exit_sleep_mode(&h_Mlx90614);
+
+    uint16_t celcius_ambient[2];
+    uint16_t celcius_object[2];
+
   /* Infinite loop */
   for(;;)
   {
 
+    memset(str, 0, sizeof(str));
 
     // Задержка измерений и индикация
-    HAL_GPIO_WritePin(LD3_GPIO_Port,LD3_Pin,GPIO_PIN_SET);
-    osDelay(200);
+    HAL_GPIO_TogglePin(LD3_GPIO_Port,LD3_Pin);
+    osDelay(1000);
 
-      // snprintf(str_adc_measure, sizeof(str_adc_measure), "ADC measure result: %03u (%u.%02uV)\r\n", adc_meaure_result, (uint32_t)voltage_measure, (uint16_t) ((voltage_measure - (uint32_t) voltage_measure) * 100.));
-      // HAL_UART_Transmit(&huart1, (uint8_t*)str_adc_measure, strlen(str_adc_measure), HAL_MAX_DELAY);
-      // CDC_Transmit_FS(str_adc_measure,strlen(str_adc_measure)); //USBUSER_Log("%u");
+    result = mlx90614_read_ambient(&h_Mlx90614, &raw_val1, &ambient);
+    osDelay(7);
+    result = mlx90614_read_object1(&h_Mlx90614, &raw_val2, &object);
+
+    celcius_ambient[0] = (uint16_t) ambient;
+    celcius_ambient[1]=(uint16_t) ((ambient - (uint16_t) ambient) * 10.);
+    celcius_object[0] = (uint16_t) object;
+    celcius_object[1] = (uint16_t) ((object - (uint16_t)object) * 10.);
+    snprintf(str, sizeof(str), "t ambient: %03u (%u.%02u C) t object: %03u (%u.%02u C)\r\n", raw_val1, celcius_ambient[0], celcius_ambient[1], raw_val2, celcius_object[0], celcius_object[1]);
+    // HAL_UART_Transmit(&huart1, (uint8_t*)str_adc_measure, strlen(str_adc_measure), HAL_MAX_DELAY);
+    CDC_Transmit_FS(str,strlen(str)); //USBUSER_Log("%u");
 
   }
   /* USER CODE END 5 */
