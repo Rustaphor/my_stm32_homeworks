@@ -61,6 +61,8 @@ void Error_Handler(void);
 #define MY_ADC_IN_GPIO_Port GPIOC
 #define EXT_USER_BUTTON_Pin GPIO_PIN_0
 #define EXT_USER_BUTTON_GPIO_Port GPIOA
+#define MY_DAC_OUT_Pin GPIO_PIN_4
+#define MY_DAC_OUT_GPIO_Port GPIOA
 #define EXT_RESET_Pin GPIO_PIN_5
 #define EXT_RESET_GPIO_Port GPIOC
 #define LD3_Pin GPIO_PIN_6

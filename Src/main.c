@@ -48,6 +48,8 @@ typedef StaticTask_t osStaticThreadDef_t;
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc;
 
+DAC_HandleTypeDef hdac;
+
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
 uint32_t defaultTaskBuffer[ 256 ];
@@ -68,6 +70,7 @@ const osThreadAttr_t defaultTask_attributes = {
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_ADC_Init(void);
+static void MX_DAC_Init(void);
 void task_Default(void *argument);
 
 /* USER CODE BEGIN PFP */
@@ -111,6 +114,7 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_ADC_Init();
+  MX_DAC_Init();
   /* USER CODE BEGIN 2 */
   
   /* USER CODE END 2 */
@@ -264,6 +268,46 @@ static void MX_ADC_Init(void)
 }
 
 /**
+  * @brief DAC Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_DAC_Init(void)
+{
+
+  /* USER CODE BEGIN DAC_Init 0 */
+
+  /* USER CODE END DAC_Init 0 */
+
+  DAC_ChannelConfTypeDef sConfig = {0};
+
+  /* USER CODE BEGIN DAC_Init 1 */
+
+  /* USER CODE END DAC_Init 1 */
+
+  /** DAC Initialization
+  */
+  hdac.Instance = DAC;
+  if (HAL_DAC_Init(&hdac) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** DAC channel OUT1 config
+  */
+  sConfig.DAC_Trigger = DAC_TRIGGER_SOFTWARE;
+  sConfig.DAC_OutputBuffer = DAC_OUTPUTBUFFER_ENABLE;
+  if (HAL_DAC_ConfigChannel(&hdac, &sConfig, DAC_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN DAC_Init 2 */
+
+  /* USER CODE END DAC_Init 2 */
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -320,6 +364,8 @@ void task_Default(void *argument)
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 5 */
 
+  HAL_DAC_Start(&hdac, DAC_CHANNEL_1);
+
   uint8_t adc_meaure_result, last_adc_measure_result;
   float voltage_measure;
 
@@ -342,8 +388,9 @@ void task_Default(void *argument)
     if (adc_meaure_result != last_adc_measure_result) {
       // Отправка строки по CDC USB
       voltage_measure = (float) adc_meaure_result * ADC_MAX_VOLTAGE_MEASURE / 255.0f;
-      snprintf(str_adc_measure, sizeof(str_adc_measure), "ADC measure result: %03u (%d.%02dV)\r\n", adc_meaure_result, (uint32_t)voltage_measure, (uint16_t) ((voltage_measure - (uint32_t) voltage_measure) * 100.));
+      snprintf(str_adc_measure, sizeof(str_adc_measure), "ADC measure result: %03u (%u.%02uV)\r\n", adc_meaure_result, (uint32_t)voltage_measure, (uint16_t) ((voltage_measure - (uint32_t) voltage_measure) * 100.));
       // HAL_UART_Transmit(&huart1, (uint8_t*)str_adc_measure, strlen(str_adc_measure), HAL_MAX_DELAY);
+      HAL_DAC_SetValue(&hdac, DAC_CHANNEL_1, DAC_ALIGN_8B_R, (4096/256) * adc_meaure_result);
       CDC_Transmit_FS(str_adc_measure,strlen(str_adc_measure)); //USBUSER_Log("%u");
       last_adc_measure_result = adc_meaure_result;
     }
