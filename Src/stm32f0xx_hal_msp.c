@@ -78,6 +78,7 @@ void HAL_MspInit(void)
   /* USER CODE END MspInit 1 */
 }
 
+<<<<<<< Updated upstream
 /**
   * @brief TIM_Base MSP Initialization
   * This function configures the hardware resources used in this example
@@ -129,6 +130,8 @@ void HAL_TIM_Base_MspDeInit(TIM_HandleTypeDef* htim_base)
 
 }
 
+=======
+>>>>>>> Stashed changes
 /* USER CODE BEGIN 1 */
 
 /* USER CODE END 1 */

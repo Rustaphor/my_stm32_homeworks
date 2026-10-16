@@ -43,8 +43,11 @@ typedef StaticEventGroup_t osStaticEventGroupDef_t;
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+<<<<<<< Updated upstream
 TIM_HandleTypeDef htim7;
 
+=======
+>>>>>>> Stashed changes
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
 const osThreadAttr_t defaultTask_attributes = {
@@ -67,7 +70,10 @@ const osEventFlagsAttr_t TIM_OVF_attributes = {
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+<<<<<<< Updated upstream
 static void MX_TIM7_Init(void);
+=======
+>>>>>>> Stashed changes
 void task_Default(void *argument);
 
 /* USER CODE BEGIN PFP */
@@ -79,11 +85,14 @@ void task_Default(void *argument);
 void my_millis(uint32_t val) {
   uint32_t flags;
 
+<<<<<<< Updated upstream
   for (uint32_t i=0; i<=val; i++) {
     flags = osEventFlagsWait(TIM_OVFHandle, 0x01, osFlagsWaitAny, osWaitForever);
     osEventFlagsClear(TIM_OVFHandle, flags); 
   }
 }
+=======
+>>>>>>> Stashed changes
 
 /* USER CODE END 0 */
 
@@ -116,7 +125,10 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+<<<<<<< Updated upstream
   MX_TIM7_Init();
+=======
+>>>>>>> Stashed changes
   /* USER CODE BEGIN 2 */
   
   // Старт кастомного таймера задержки
@@ -213,6 +225,7 @@ void SystemClock_Config(void)
 }
 
 /**
+<<<<<<< Updated upstream
   * @brief TIM7 Initialization Function
   * @param None
   * @retval None
@@ -251,6 +264,8 @@ static void MX_TIM7_Init(void)
 }
 
 /**
+=======
+>>>>>>> Stashed changes
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -314,8 +329,21 @@ void task_Default(void *argument)
   /* Infinite loop */
   for(;;)
   {
+<<<<<<< Updated upstream
     my_millis(500);
     HAL_GPIO_TogglePin(LD6_GPIO_Port,LD6_Pin);
+=======
+
+
+    // Задержка измерений и индикация
+    HAL_GPIO_WritePin(LD3_GPIO_Port,LD3_Pin,GPIO_PIN_SET);
+    osDelay(200);
+
+      // snprintf(str_adc_measure, sizeof(str_adc_measure), "ADC measure result: %03u (%u.%02uV)\r\n", adc_meaure_result, (uint32_t)voltage_measure, (uint16_t) ((voltage_measure - (uint32_t) voltage_measure) * 100.));
+      // HAL_UART_Transmit(&huart1, (uint8_t*)str_adc_measure, strlen(str_adc_measure), HAL_MAX_DELAY);
+      // CDC_Transmit_FS(str_adc_measure,strlen(str_adc_measure)); //USBUSER_Log("%u");
+    }
+>>>>>>> Stashed changes
   }
   /* USER CODE END 5 */
 }
