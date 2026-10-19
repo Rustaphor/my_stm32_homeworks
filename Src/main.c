@@ -22,11 +22,14 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <stdio.h>
+#include <string.h>
+#include <stdint.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 typedef StaticTask_t osStaticThreadDef_t;
+typedef StaticSemaphore_t osStaticSemaphoreDef_t;
 /* USER CODE BEGIN PTD */
 
 /* USER CODE END PTD */
@@ -42,6 +45,8 @@ typedef StaticTask_t osStaticThreadDef_t;
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+UART_HandleTypeDef huart1;
+
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
 uint32_t defaultTaskBuffer[ 128 ];
@@ -54,20 +59,38 @@ const osThreadAttr_t defaultTask_attributes = {
   .stack_size = sizeof(defaultTaskBuffer),
   .priority = (osPriority_t) osPriorityNormal,
 };
+/* Definitions for semUartTx */
+osSemaphoreId_t semUartTxHandle;
+osStaticSemaphoreDef_t sem_UartTx;
+const osSemaphoreAttr_t semUartTx_attributes = {
+  .name = "semUartTx",
+  .cb_mem = &sem_UartTx,
+  .cb_size = sizeof(sem_UartTx),
+};
 /* USER CODE BEGIN PV */
-
+char uart_transmit_str[64];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_USART1_UART_Init(void);
 void task_Default(void *argument);
 
 /* USER CODE BEGIN PFP */
 
+// Callback функция, вызываемая по завершению передачи данных по UART
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart) {
+  if(huart->Instance == USART1) {
+    osSemaphoreRelease(semUartTxHandle);
+    __NOP(); // Для отладки, чтобы можно было поставить точку останова в этой функции
+  }
+}
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
+/* USER CODE BEGIN 0 */
 
 /* USER CODE END 0 */
 
@@ -100,6 +123,7 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
   
   /* USER CODE END 2 */
@@ -110,6 +134,10 @@ int main(void)
   /* USER CODE BEGIN RTOS_MUTEX */
   /* add mutexes, ... */
   /* USER CODE END RTOS_MUTEX */
+
+  /* Create the semaphores(s) */
+  /* creation of semUartTx */
+  semUartTxHandle = osSemaphoreNew(1, 1, &semUartTx_attributes);
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
   /* add semaphores, ... */
@@ -159,6 +187,7 @@ void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
 
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
@@ -187,6 +216,47 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART1;
+  PeriphClkInit.Usart1ClockSelection = RCC_USART1CLKSOURCE_PCLK1;
+  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
+  {
+    Error_Handler();
+  }
+}
+
+/**
+  * @brief USART1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART1_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART1_Init 0 */
+
+  /* USER CODE END USART1_Init 0 */
+
+  /* USER CODE BEGIN USART1_Init 1 */
+
+  /* USER CODE END USART1_Init 1 */
+  huart1.Instance = USART1;
+  huart1.Init.BaudRate = 115200;
+  huart1.Init.WordLength = UART_WORDLENGTH_8B;
+  huart1.Init.StopBits = UART_STOPBITS_1;
+  huart1.Init.Parity = UART_PARITY_NONE;
+  huart1.Init.Mode = UART_MODE_TX_RX;
+  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART1_Init 2 */
+
+  /* USER CODE END USART1_Init 2 */
+
 }
 
 /**
@@ -245,11 +315,26 @@ void task_Default(void *argument)
 {
   /* USER CODE BEGIN 5 */
 
+  int8_t result = 0;
+  unsigned int counter = 0;
+
   /* Infinite loop */
   for(;;)
   {
-    osDelay(500);
+    osDelay(1000);
     HAL_GPIO_TogglePin(LD5_GPIO_Port,LD5_Pin);
+
+    memset(uart_transmit_str, 0, sizeof(uart_transmit_str));
+    result = sprintf(uart_transmit_str, "Hello Otus! #%u\r\n", counter);
+
+    // Если есть что отправлять
+    if (result > 0)
+    {
+      osSemaphoreAcquire(semUartTxHandle, osWaitForever); // Захватываем семафор перед отправкой данных
+      HAL_UART_Transmit_IT(&huart1, (uint8_t*) uart_transmit_str, strlen(uart_transmit_str));
+      counter++;
+    }
+
   }
   /* USER CODE END 5 */
 }
