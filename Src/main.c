@@ -19,7 +19,6 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "cmsis_os.h"
-#include <stdint.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -27,7 +26,7 @@
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
-typedef StaticEventGroup_t osStaticEventGroupDef_t;
+typedef StaticTask_t osStaticThreadDef_t;
 /* USER CODE BEGIN PTD */
 
 /* USER CODE END PTD */
@@ -43,22 +42,17 @@ typedef StaticEventGroup_t osStaticEventGroupDef_t;
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-TIM_HandleTypeDef htim7;
-
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
+uint32_t defaultTaskBuffer[ 128 ];
+osStaticThreadDef_t defaultTaskControlBlock;
 const osThreadAttr_t defaultTask_attributes = {
   .name = "defaultTask",
-  .stack_size = 128 * 4,
+  .cb_mem = &defaultTaskControlBlock,
+  .cb_size = sizeof(defaultTaskControlBlock),
+  .stack_mem = &defaultTaskBuffer[0],
+  .stack_size = sizeof(defaultTaskBuffer),
   .priority = (osPriority_t) osPriorityNormal,
-};
-/* Definitions for TIM_OVF */
-osEventFlagsId_t TIM_OVFHandle;
-osStaticEventGroupDef_t event_TIMs;
-const osEventFlagsAttr_t TIM_OVF_attributes = {
-  .name = "TIM_OVF",
-  .cb_mem = &event_TIMs,
-  .cb_size = sizeof(event_TIMs),
 };
 /* USER CODE BEGIN PV */
 
@@ -67,7 +61,6 @@ const osEventFlagsAttr_t TIM_OVF_attributes = {
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_TIM7_Init(void);
 void task_Default(void *argument);
 
 /* USER CODE BEGIN PFP */
@@ -75,15 +68,6 @@ void task_Default(void *argument);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
-/* USER CODE BEGIN 0 */
-void my_millis(uint32_t val) {
-  uint32_t flags;
-
-  for (uint32_t i=0; i<=val; i++) {
-    flags = osEventFlagsWait(TIM_OVFHandle, 0x01, osFlagsWaitAny, osWaitForever);
-    osEventFlagsClear(TIM_OVFHandle, flags); 
-  }
-}
 
 /* USER CODE END 0 */
 
@@ -116,11 +100,8 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_TIM7_Init();
   /* USER CODE BEGIN 2 */
   
-  // Старт кастомного таймера задержки
-  HAL_TIM_Base_Start_IT(&htim7);
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -149,10 +130,6 @@ int main(void)
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
-
-  /* Create the event(s) */
-  /* creation of TIM_OVF */
-  TIM_OVFHandle = osEventFlagsNew(&TIM_OVF_attributes);
 
   /* USER CODE BEGIN RTOS_EVENTS */
   /* add events, ... */
@@ -213,44 +190,6 @@ void SystemClock_Config(void)
 }
 
 /**
-  * @brief TIM7 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_TIM7_Init(void)
-{
-
-  /* USER CODE BEGIN TIM7_Init 0 */
-
-  /* USER CODE END TIM7_Init 0 */
-
-  TIM_MasterConfigTypeDef sMasterConfig = {0};
-
-  /* USER CODE BEGIN TIM7_Init 1 */
-
-  /* USER CODE END TIM7_Init 1 */
-  htim7.Instance = TIM7;
-  htim7.Init.Prescaler = 0;
-  htim7.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim7.Init.Period = 23999;
-  htim7.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
-  if (HAL_TIM_Base_Init(&htim7) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_UPDATE;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim7, &sMasterConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN TIM7_Init 2 */
-
-  /* USER CODE END TIM7_Init 2 */
-
-}
-
-/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -291,12 +230,7 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-// Прерывание таймера задержки
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
-  if(htim->Instance == TIM7){
-      osEventFlagsSet(TIM_OVFHandle,0x01);
-  }
-}
+
 
 /* USER CODE END 4 */
 
@@ -314,8 +248,8 @@ void task_Default(void *argument)
   /* Infinite loop */
   for(;;)
   {
-    my_millis(500);
-    HAL_GPIO_TogglePin(LD6_GPIO_Port,LD6_Pin);
+    osDelay(500);
+    HAL_GPIO_TogglePin(LD5_GPIO_Port,LD5_Pin);
   }
   /* USER CODE END 5 */
 }
