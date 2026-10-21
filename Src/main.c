@@ -23,8 +23,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "stm32f072b_disco_bus.h"
-#include "a3g4250d.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -57,7 +56,7 @@ const osThreadAttr_t defaultTask_attributes = {
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* USER CODE BEGIN PV */
-A3G4250D_Object_t my_A3G4250D_handler;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -71,60 +70,7 @@ void task_Default(void *argument);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-static int32_t A3G4250D_getTicks_cb(void){
-  __NOP();
-  return (int32_t) HAL_GetTick();
-}
 
-static int32_t A3G4250D_WriteReg_cb(uint16_t offset, uint16_t reg_addr, uint8_t *pData, uint16_t len){
-  // Приведение reg_addr к 6 битным адресам и сброс первого бита (команда записи)
-  reg_addr &= 0xBFU;
-
-  uint16_t buff_len = len + 1; // +1 для передачи адреса регистра
-  uint8_t buffer[buff_len];
-  buffer[0] = (uint8_t) reg_addr; // Установка бита чтения 
-  if (len > 1) {
-    buffer[0] |= 0x40U; // Установка бита множественного чтения, если читаем более одного байта
-  }
-  HAL_GPIO_WritePin(MEMS_CS_GPIO_Port, MEMS_CS_Pin, GPIO_PIN_RESET);
-  osDelay(1);
-  int32_t result = HAL_SPI_Transmit(&hspi2, buffer, buff_len, HAL_MAX_DELAY);
-  memcpy(pData, buffer + 1, len);
-  osDelay(1);
-  HAL_GPIO_WritePin(MEMS_CS_GPIO_Port, MEMS_CS_Pin, GPIO_PIN_SET);
-  __NOP();
-  return result;
-}
-
-
-static int32_t A3G4250D_ReadReg_cb(uint16_t offset, uint16_t reg_addr, uint8_t *pData, uint16_t len){
-
-  uint16_t buff_len = len + 1; // +1 для передачи адреса регистра
-  uint8_t buffer[2][buff_len];
-  buffer[0][0] = (uint8_t) reg_addr | 0x80; // Установка бита чтения и адреса регистра
-  buffer[0][1] = 0xFFU;
-  if (len > 1) {
-    buffer[0][0] |= 0x40U; // Установка бита множественного чтения, если читаем более одного байта
-  }
-  HAL_GPIO_WritePin(MEMS_CS_GPIO_Port, MEMS_CS_Pin, GPIO_PIN_RESET);
-  osDelay(1);
-  int32_t result = HAL_SPI_TransmitReceive(&hspi2, buffer[0], buffer[1], buff_len, HAL_MAX_DELAY);
-  memcpy(pData, &buffer[1][1], len);
-  osDelay(1);
-  HAL_GPIO_WritePin(MEMS_CS_GPIO_Port, MEMS_CS_Pin, GPIO_PIN_SET);
-  __NOP();
-  return result;
-}
-
-static A3G4250D_IO_t my_A3G4250D_IO = {
-  .Init      = BSP_SPI2_Init,
-  .DeInit    = BSP_SPI2_DeInit,
-  .BusType   = A3G4250D_SPI_4WIRES_BUS,
-  .WriteReg  = A3G4250D_WriteReg_cb,
-  .ReadReg   = A3G4250D_ReadReg_cb,
-  .GetTick   = A3G4250D_getTicks_cb,
-  .Delay     = HAL_Delay
-};
 /* USER CODE END 0 */
 
 /**
@@ -157,7 +103,6 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   /* USER CODE BEGIN 2 */
-  A3G4250D_RegisterBusIO(&my_A3G4250D_handler, &my_A3G4250D_IO);
   
   /* USER CODE END 2 */
 
@@ -303,8 +248,6 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-A3G4250D_AxesRaw_t gyro_raw_data;
-uint8_t data;
 
 /* USER CODE END 4 */
 
@@ -321,10 +264,6 @@ void task_Default(void *argument)
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 5 */
 
-  uint8_t whoAmI_id = 0;
-  if (A3G4250D_ReadID(&my_A3G4250D_handler, &whoAmI_id) == A3G4250D_WHO_AM_I){
-    __NOP(); // TODO: Add your code here
-  }
 
   /* Infinite loop */
   for(;;)
@@ -332,8 +271,6 @@ void task_Default(void *argument)
     osDelay(200);
     HAL_GPIO_TogglePin(LD5_GPIO_Port,LD5_Pin);
 
-    A3G4250D_GYRO_GetAxesRaw(&my_A3G4250D_handler, &gyro_raw_data);
-    A3G4250D_Read_Reg(&my_A3G4250D_handler, A3G4250D_OUT_TEMP, &data);
   }
   /* USER CODE END 5 */
 }
