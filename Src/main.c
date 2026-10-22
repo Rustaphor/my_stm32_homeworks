@@ -23,8 +23,11 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "usbd_cdc_if.h"
 #include "stm32f072b_disco_bus.h"
 #include "a3g4250d.h"
+#include <stdio.h>
+#include <string.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -77,39 +80,35 @@ static int32_t A3G4250D_getTicks_cb(void){
 }
 
 static int32_t A3G4250D_WriteReg_cb(uint16_t offset, uint16_t reg_addr, uint8_t *pData, uint16_t len){
-  // Приведение reg_addr к 6 битным адресам и сброс первого бита (команда записи)
-  reg_addr &= 0xBFU;
-
   uint16_t buff_len = len + 1; // +1 для передачи адреса регистра
   uint8_t buffer[buff_len];
-  buffer[0] = (uint8_t) reg_addr; // Установка бита чтения 
+  buffer[0] = reg_addr & 0x3FU; // Установка адреса регистра, снятие битов чтения и множественного чтения
   if (len > 1) {
     buffer[0] |= 0x40U; // Установка бита множественного чтения, если читаем более одного байта
   }
+  memcpy(buffer + 1, pData, len);
   HAL_GPIO_WritePin(MEMS_CS_GPIO_Port, MEMS_CS_Pin, GPIO_PIN_RESET);
   osDelay(1);
   int32_t result = HAL_SPI_Transmit(&hspi2, buffer, buff_len, HAL_MAX_DELAY);
-  memcpy(pData, buffer + 1, len);
   osDelay(1);
   HAL_GPIO_WritePin(MEMS_CS_GPIO_Port, MEMS_CS_Pin, GPIO_PIN_SET);
-  __NOP();
   return result;
 }
 
 
 static int32_t A3G4250D_ReadReg_cb(uint16_t offset, uint16_t reg_addr, uint8_t *pData, uint16_t len){
-
+  reg_addr &= 0xBFU;  // Fix: снятие бита множественного чтения
   uint16_t buff_len = len + 1; // +1 для передачи адреса регистра
   uint8_t buffer[2][buff_len];
-  buffer[0][0] = (uint8_t) reg_addr | 0x80; // Установка бита чтения и адреса регистра
-  buffer[0][1] = 0xFFU;
-  if (len > 1) {
+  buffer[0][0] = reg_addr | 0x80U; // Установка адреса регистра и бита чтения
+  buffer[0][1] = 0;
+  if (len > 1) {  
     buffer[0][0] |= 0x40U; // Установка бита множественного чтения, если читаем более одного байта
   }
   HAL_GPIO_WritePin(MEMS_CS_GPIO_Port, MEMS_CS_Pin, GPIO_PIN_RESET);
   osDelay(1);
   int32_t result = HAL_SPI_TransmitReceive(&hspi2, buffer[0], buffer[1], buff_len, HAL_MAX_DELAY);
-  memcpy(pData, &buffer[1][1], len);
+  memcpy(pData, buffer[1] + 1, len);
   osDelay(1);
   HAL_GPIO_WritePin(MEMS_CS_GPIO_Port, MEMS_CS_Pin, GPIO_PIN_SET);
   __NOP();
@@ -304,7 +303,8 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 A3G4250D_AxesRaw_t gyro_raw_data;
-uint8_t data;
+uint8_t temp = 0;
+char str_buff[64];
 
 /* USER CODE END 4 */
 
@@ -321,9 +321,14 @@ void task_Default(void *argument)
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 5 */
 
-  uint8_t whoAmI_id = 0;
-  if (A3G4250D_ReadID(&my_A3G4250D_handler, &whoAmI_id) == A3G4250D_WHO_AM_I){
-    __NOP(); // TODO: Add your code here
+  { // Временный блок на стеке, очищаемый при выходе
+    uint8_t whoAmI_id = 0;
+    if (A3G4250D_ReadID(&my_A3G4250D_handler, &whoAmI_id) == A3G4250D_OK && whoAmI_id == 0xD4U){
+
+      A3G4250D_Init(&my_A3G4250D_handler);
+      A3G4250D_GYRO_Enable(&my_A3G4250D_handler);
+      __NOP(); // Место для брекпойнта
+    }
   }
 
   /* Infinite loop */
@@ -332,8 +337,14 @@ void task_Default(void *argument)
     osDelay(200);
     HAL_GPIO_TogglePin(LD5_GPIO_Port,LD5_Pin);
 
+    memset(str_buff, 0, sizeof(str_buff));
+
+    // Read Gyroscope data
     A3G4250D_GYRO_GetAxesRaw(&my_A3G4250D_handler, &gyro_raw_data);
-    A3G4250D_Read_Reg(&my_A3G4250D_handler, A3G4250D_OUT_TEMP, &data);
+    // Get temperature
+    A3G4250D_Read_Reg(&my_A3G4250D_handler, A3G4250D_OUT_TEMP, &temp);
+    sprintf(str_buff, "Gyro X:%05i\tY:%05i\tZ:%05i\tTemp:%02Xh  \r", gyro_raw_data.x, gyro_raw_data.y, gyro_raw_data.z, temp);
+    CDC_Transmit_FS((uint8_t *) str_buff, strlen(str_buff));
   }
   /* USER CODE END 5 */
 }
